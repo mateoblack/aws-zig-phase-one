@@ -26,9 +26,9 @@ Deploy a temporary EC2 instance to run NSA ZIG Phase One compliance checks again
 ./scripts/connect.sh --wait
 
 # 3. Run the checker (on the instance)
-zig-check
+zig-check 
 
-# 4. Destroy when done
+# 4. exit instance and Destroy when done
 ./scripts/destroy.sh
 ```
 
