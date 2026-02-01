@@ -133,7 +133,7 @@ Key GovCloud-specific gaps:
 **GovCloud Notes:**
 - **CRITICAL:** Amazon Macie is NOT available in GovCloud regions
 - Data classification must use third-party tools or manual processes
-- Consider: Trellix DLP, Forcepoint, McAfee, or custom Lambda-based classification
+- Consider: custom Lambda-based classification
 
 ---
 
