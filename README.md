@@ -1,4 +1,4 @@
-# NSA Zero Trust Implementation Guideline (ZIG) Phase One
+# Zero Trust Implementation Guideline (ZIG) Phase One
 ## AWS Compliance Checker
 
 A command-line tool to assess AWS environments against the [NSA Zero Trust Implementation Guideline Phase One](https://media.defense.gov/2026/Jan/30/2003868308/-1/-1/0/CTR_ZIG_PHASE_ONE.PDF) requirements.
@@ -25,14 +25,14 @@ This script evaluates your AWS account against the 36 activities defined in NSA 
 
 ```bash
 # Download
-curl -O https://raw.githubusercontent.com/yourorg/zig-checker/main/nsa-zig-phase-one-aws-checker.sh
-chmod +x nsa-zig-phase-one-aws-checker.sh
+curl -O REPLACE ME 
+chmod +x aws-zig-phase-one-checker.sh
 
 # Run
-./nsa-zig-phase-one-aws-checker.sh
+./aws-zig-phase-one-checker.sh
 
 # With options
-./nsa-zig-phase-one-aws-checker.sh --profile prod --region us-gov-west-1 --output json
+./aws-zig-phase-one-checker.sh --profile prod --region us-gov-west-1 --output json
 ```
 
 **Requirements:** AWS CLI v2, jq, appropriate IAM read permissions (see [Permissions](#permissions))
@@ -67,7 +67,7 @@ Some ZIG Phase One requirements need capabilities beyond what any single cloud p
 
 Projects like [Sentinel](https://github.com/mateoblack/sentinel) are building AWS-native solutions for some of these requirements—specifically policy-based credential issuance with approval workflows and break-glass procedures. As the ZT ecosystem matures, expect more purpose-built tools to emerge.
 
-For a detailed coverage analysis, see [nsa-zig-phase-one-aws-analysis.md](./nsa-zig-phase-one-aws-analysis.md).
+For a detailed coverage analysis, see [nsa-zig-phase-one-aws-analysis.md](./aws-zig-phase-one-checker.sh).
 
 ---
 
