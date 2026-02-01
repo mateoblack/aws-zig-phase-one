@@ -48,7 +48,7 @@ The checker reports findings at four severity levels:
 | `BLOCKER` | Critical security gap | Fix immediately |
 | `HIGH` | Significant risk | Address this sprint |
 | `MEDIUM` | Should improve | Plan remediation |
-| `LOW` | Enhancement opportunity | Backlog |
+| `LOW` | Enhancement opportunity | Continous Improvement |
 
 ---
 
