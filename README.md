@@ -67,7 +67,7 @@ Some ZIG Phase One requirements need capabilities beyond what any single cloud p
 
 Projects like [Sentinel](https://github.com/mateoblack/sentinel) are building AWS-native solutions for some of these requirements—specifically policy-based credential issuance with approval workflows and break-glass procedures. As the ZT ecosystem matures, expect more purpose-built tools to emerge.
 
-For a detailed coverage analysis, see [nsa-zig-phase-one-aws-analysis.md](./aws-zig-phase-one-checker.sh).
+For a detailed coverage analysis, see [aws-zig-phase-one-analysis.md](./aws-zig-phase-one-checker.sh).
 
 ---
 
