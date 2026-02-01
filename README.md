@@ -27,14 +27,14 @@ Evaluates 36 activities across the 7 ZIG pillars using GovCloud-available servic
 
 ```bash
 # Download
-curl -O https://raw.githubusercontent.com/yourorg/zig-checker/main/nsa-zig-phase-one-aws-checker.sh
-chmod +x nsa-zig-phase-one-aws-checker.sh
+curl -O https://github.com/mateoblack/aws-zig-phase-one/blob/main/aws-zig-phase-one-checker.sh
+chmod +x aws-zig-phase-one-checker.sh
 
 # Run against GovCloud
-./nsa-zig-phase-one-aws-checker.sh --profile govcloud --region us-gov-west-1
+./aws-zig-phase-one-checker.sh --profile govcloud --region us-gov-west-1
 
 # Generate JSON report
-./nsa-zig-phase-one-aws-checker.sh --profile govcloud --region us-gov-west-1 --output json
+./aws-zig-phase-one-checker.sh --profile govcloud --region us-gov-west-1 --output json
 ```
 
 **Requirements:** AWS CLI v2, jq, IAM read permissions ([see full list](#permissions))
@@ -65,7 +65,7 @@ Zero Trust spans identity, devices, data, and networks across your entire enterp
 
 **The ecosystem is maturing rapidly** Projects like [Sentinel](https://github.com/mateoblack/sentinel) provide policy-based credential issuance with approval workflows and break-glass—filling the PAM gap with patterns purpose-built for AWS. As of 01-FEB-2026 Sentinel is still in Work-In-Progress status.
 
-For detailed coverage analysis, see [nsa-zig-phase-one-aws-govcloud-analysis.md](./nsa-zig-phase-one-aws-govcloud-analysis.md).
+For detailed coverage analysis, see [aws-zig-phase-one-analysis.md](./aws-zig-phase-one-analysis.md).
 
 ---
 
