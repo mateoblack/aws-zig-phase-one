@@ -60,8 +60,8 @@ Key GovCloud-specific gaps:
 
 | Service | Impact | Alternative |
 |---------|--------|-------------|
-| **Amazon Macie** | Cannot auto-classify S3 data (4.3.1, 4.6.1) | Trellix DLP, Forcepoint, manual classification |
-| **IAM Access Analyzer policy generation** | Cannot auto-generate least-privilege policies | Manual policy review, Cloud Custodian |
+| **Amazon Macie** | Cannot auto-classify S3 data (4.3.1, 4.6.1) | manual classification |
+| **IAM Access Analyzer policy generation** | Cannot auto-generate least-privilege policies | Manual policy review |
 
 ---
 
