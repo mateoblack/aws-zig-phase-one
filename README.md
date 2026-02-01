@@ -58,10 +58,10 @@ Zero Trust spans identity, devices, data, and networks across your entire enterp
 
 | Requirement | What AWS Provides | Ecosystem Solutions |
 |-------------|-------------------|---------------------|
-| **PAM / JIT Access** | IAM roles, Secrets Manager | [Sentinel](https://github.com/mateoblack/sentinel), HashiCorp Vault |
-| **Device Posture** | SSM for EC2 | AWS Verified Access, Zscaler ZPA |
-| **Unified Policy** | IAM + SCPs + resource policies | Open Policy Agent (OPA) |
-| **SIEM Correlation** | Security Hub, OpenSearch | Splunk, Elastic |
+| **PAM / JIT Access** | IAM roles, Secrets Manager | [Sentinel](https://github.com/mateoblack/sentinel)(work-in-progress), self research required |
+| **Device Posture** | SSM for EC2 | AWS Verified Access, self research required |
+| **Unified Policy** | IAM + SCPs + resource policies | [Sentinel](https://github.com/mateoblack/sentinel)(work-in-progress) when enabled with aws orgs, self research required |
+| **SIEM Correlation** | Security Hub |
 
 **The ecosystem is maturing rapidly** Projects like [Sentinel](https://github.com/mateoblack/sentinel) provide policy-based credential issuance with approval workflows and break-glass—filling the PAM gap with patterns purpose-built for AWS. As of 01-FEB-2026 Sentinel is still in Work-In-Progress status.
 
