@@ -224,6 +224,7 @@ These solutions are FedRAMP authorized and commonly used in GovCloud:
 ## Ecosystem Projects
 
 The ecosystem is maturing rapidly projects like [Sentinel](https://github.com/mateoblack/sentinel) provide policy-based credential issuance with approval workflows and break-glass—filling the PAM gap with patterns purpose-built for AWS. As of 01-FEB-2026 Sentinel is still in Work-In-Progress status.
+
 ---
 
 ## Running the Compliance Checker
