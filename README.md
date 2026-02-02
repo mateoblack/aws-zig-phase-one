@@ -60,6 +60,8 @@ Deploy the CDK stack to your security account, use StackSets to push ZigCheckerR
 | `MEDIUM` | Should improve | Plan remediation |
 | `LOW` | Enhancement opportunity | Backlog |
 
+See [examples/example-output.txt](./examples/example-output.txt) for sample output.
+
 ---
 
 ## Beyond Native AWS

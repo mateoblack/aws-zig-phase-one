@@ -1,0 +1,133 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║  NSA Zero Trust Implementation Guideline (ZIG) Phase One                   ║
+║  AWS GovCloud Compliance Checker v1.0.0                                    ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+[INFO] Running pre-flight checks...
+[INFO] Checking AWS Account: 123456789012-fake
+[INFO] Region: us-gov-west-1
+[INFO] Profile: default
+
+
+============================================================================
+PILLAR 1: USER
+============================================================================
+[INFO] Checking Activity 1.3.1 - MFA and IdP...
+[BLOCKER] [1.3.1] Root account does NOT have MFA enabled
+[PASS] All IAM users with console access have MFA enabled
+[PASS] AWS IAM Identity Center (SSO) is configured
+[INFO]   Identity Store ID: d-xxxxxxxxxx
+[INFO] Checking Activity 1.4.1 - Privileged Access Management...
+[PASS] No IAM users with direct AdministratorAccess policy
+[PASS] No access keys older than 90 days
+[INFO] Checking Activity 1.5.1 - Identity Lifecycle Management...
+[PASS] No users inactive for 90+ days found
+[INFO] Checking Activity 1.7.1 - Deny by Default Policy...
+[PASS] No customer policies with unrestricted Action:* Resource:* found
+[MEDIUM] [1.7.1] Only default SCP - no custom deny policies
+
+[INFO] User Pillar Score: 6/8 checks passed
+
+============================================================================
+PILLAR 2: DEVICE
+============================================================================
+[INFO] Checking Activity 2.1.2 - Device Inventory...
+[PASS] No EC2 instances running - SSM check N/A
+[INFO] Checking Activity 2.4.1 - Deny Device by Default...
+[HIGH] [2.4.1] Default security groups with inbound rules: sg-xxxxxxxxxxxxxxxxx (vpc-xxxxxxxxxxxxxxxxx)
+[HIGH] [2.4.1] 10 security groups allow 0.0.0.0/0 inbound
+[INFO] Checking Activity 2.5.1 - Vulnerability and Patch Management...
+[HIGH] [2.5.1] AWS Inspector is not enabled
+[PASS] All managed instances are patch compliant
+[INFO] Checking Activity 2.6.1/2.6.2 - Endpoint Management...
+[MEDIUM] [2.6.1] No SSM State Manager associations configured
+[INFO] Checking Activity 2.7.1 - EDR Integration...
+[BLOCKER] [2.7.1] GuardDuty is not enabled
+
+[INFO] Device Pillar Score: 2/7 checks passed
+
+============================================================================
+PILLAR 3: APPLICATION AND WORKLOAD
+============================================================================
+[INFO] Checking Activity 3.2.1/3.2.2 - DevSecOps Practices...
+[INFO] No ECR repositories found - check N/A
+[LOW] [3.2.1] No CodePipeline detected - verify CI/CD is implemented elsewhere
+[INFO] Checking Activity 3.3.1/3.3.2 - Software Risk Management...
+[INFO] Checking Activity 3.4.1/3.4.3 - Resource Authorization...
+[PASS] No Lambda functions with unrestricted public access
+[INFO] No EKS clusters found - check N/A
+
+[INFO] Application Pillar Score: 4/5 checks passed
+
+============================================================================
+PILLAR 4: DATA
+============================================================================
+[INFO] Checking Activity 4.2.1/4.3.1 - Data Classification...
+[MEDIUM] [4.3.1] Amazon Macie is NOT available in GovCloud regions
+[INFO] Checking Activity 4.4.3 - File Activity Monitoring...
+[HIGH] [4.4.3] S3 buckets without access logging: example-bucket-1 example-bucket-2 example-bucket-3
+[INFO] Checking Activity 4.5.1 - Data Protection...
+[PASS] All S3 buckets have default encryption enabled
+[INFO] No RDS instances found - check N/A
+[PASS] All symmetric KMS keys have rotation enabled
+[INFO] Checking Activity 4.6.1 - Data Loss Prevention...
+[PASS] Account-level S3 Block Public Access is fully enabled
+
+[INFO] Data Pillar Score: 4/6 checks passed
+
+============================================================================
+PILLAR 5: NETWORK AND ENVIRONMENT
+============================================================================
+[INFO] Checking Activity 5.1.2 - Granular Access Rules...
+[HIGH] [5.1.2] VPCs without flow logs: vpc-xxxxxxxxxxxxxxxxx
+[INFO] Checking Activity 5.2.2/5.3.1 - Network Segmentation...
+[MEDIUM] [5.3.1] Only default NACLs - no macro-segmentation
+[MEDIUM] [5.3.1] Network not properly tiered (public/private separation)
+[INFO] Checking Activity 5.4.1 - Micro-Segmentation...
+[PASS] No EC2 instances - micro-segmentation check N/A
+[HIGH] [5.4.1] No WAF Web ACLs configured
+
+[INFO] Network Pillar Score: 1/5 checks passed
+
+============================================================================
+PILLAR 6: AUTOMATION AND ORCHESTRATION
+============================================================================
+[INFO] Checking Activity 6.1.2 - Access Profiles...
+[HIGH] [6.1.2] IAM Access Analyzer is not enabled
+[INFO] Checking Activity 6.5.2 - Security Orchestration...
+[HIGH] [6.5.2] Security Hub is not enabled
+[LOW] [6.7.1] No EventBridge rules - limited event-driven automation
+[INFO] Checking Activity 6.6.2 - API Standardization...
+[INFO] No API Gateway APIs found - check N/A
+
+[INFO] Automation Pillar Score: 1/4 checks passed
+
+============================================================================
+PILLAR 7: VISIBILITY AND ANALYTICS
+============================================================================
+[INFO] Checking Activity 7.1.2 - Log Collection...
+[PASS] Multi-region CloudTrail is enabled
+[PASS] CloudWatch Logs has 6 log groups
+[INFO] Checking Activity 7.2.1/7.2.4 - Threat Alerting...
+[HIGH] [7.2.1] No CloudWatch alarms configured
+[MEDIUM] [7.2.1] No SNS topics for alerting
+[INFO] Checking Activity 7.3.1 - Analytics Tools...
+[HIGH] [7.3.1] AWS Config is not enabled
+[MEDIUM] [7.3.1] No AWS Config rules defined
+[INFO] Checking Activity 7.5.1 - Threat Intelligence...
+[LOW] [7.5.1] Amazon Detective is not enabled
+
+[INFO] Visibility Pillar Score: 2/7 checks passed
+
+============================================================================
+NSA ZIG PHASE ONE COMPLIANCE SUMMARY
+============================================================================
+
+PILLAR SCORES:
+  1. User:                  6/8
+  2. Device:                2/7
+  3. Application:           4/5
+  4. Data:                  4/6
+  5. Network:               1/5
+  6. Automation:            1/4
+  7. Visibility:            2/7
