@@ -68,12 +68,12 @@ Zero Trust spans identity, devices, data, and networks across your entire enterp
 
 | Requirement | What AWS Provides | Ecosystem Solutions |
 |-------------|-------------------|---------------------|
-| **PAM / JIT Access** | IAM roles, Secrets Manager | [Sentinel](https://github.com/mateoblack/sentinel)(work-in-progress), self research required |
+| **PAM / JIT Access** | IAM roles, Secrets Manager | [Sentinel](https://github.com/mateoblack/sentinel) (WIP), self research required |
 | **Device Posture** | SSM for EC2 | AWS Verified Access, self research required |
-| **Unified Policy** | IAM + SCPs + resource policies | [Sentinel](https://github.com/mateoblack/sentinel)(work-in-progress) when enabled with aws orgs, self research required |
+| **Unified Policy** | IAM + SCPs + resource policies | [Sentinel](https://github.com/mateoblack/sentinel) (WIP) when enabled with aws orgs, self research required |
 | **SIEM Correlation** | Security Hub | self research required|
 
-**The ecosystem is maturing rapidly** Projects like [Sentinel](https://github.com/mateoblack/sentinel) provide policy-based credential issuance with approval workflows and break-glass—filling the PAM gap with patterns purpose-built for AWS. As of 01-FEB-2026 Sentinel is still in Work-In-Progress status.
+**The ecosystem is maturing rapidly** Projects like [Sentinel](https://github.com/mateoblack/sentinel) provide policy-based credential issuance with approval workflows and break-glass—filling the PAM gap with patterns purpose-built for AWS. As of 01-FEB-2026 Sentinel is still in Work-In-Progress(WIP) status.
 
 For detailed coverage analysis, see [aws-zig-phase-one-analysis.md](./aws-zig-phase-one-analysis.md).
 
