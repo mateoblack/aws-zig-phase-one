@@ -1040,8 +1040,8 @@ check_pillar_5_network() {
     ((total_checks++)) || true
     local sg_count
     sg_count=$(aws_cmd ec2 describe-security-groups --query 'SecurityGroups | length(@)' --output text || echo "0")
-    local ec2_count="$ec2_running_count"
-    [[ -z "$ec2_count" ]] && ec2_count=$(aws_cmd ec2 describe-instances --filters "Name=instance-state-name,Values=running" --query 'Reservations[*].Instances | [*] | length(@)' --output text || echo "0")
+    local ec2_count
+    ec2_count=$(aws_cmd ec2 describe-instances --filters "Name=instance-state-name,Values=running" --query 'Reservations[*].Instances | [*] | length(@)' --output text || echo "0")
     
     if [[ "$ec2_count" -gt 0 && "$sg_count" -gt "$ec2_count" ]]; then
         log_pass "Good security group diversity ($sg_count SGs for $ec2_count instances)"
