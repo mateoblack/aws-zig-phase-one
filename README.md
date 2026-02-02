@@ -39,6 +39,16 @@ chmod +x aws-zig-phase-one-checker.sh
 
 **Requirements:** AWS CLI v2, jq, IAM read permissions ([see full list](#permissions))
 
+### Recommendation 
+
+>Single account? 
+
+Run the script directly from your terminal.
+
+>Multi-account org? 
+
+Deploy the CDK stack to your security account, use StackSets to push ZigCheckerRole to members, and run org-wide assessments on a schedule.
+
 ---
 
 ## Understanding Results
