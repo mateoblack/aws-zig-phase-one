@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/opt/homebrew/bin/bash
 #
 # NSA Zero Trust Implementation Guideline (ZIG) Phase One - AWS Compliance Checker
 # Version: 1.1
@@ -70,6 +70,7 @@ OUTPUT_FORMAT="${OUTPUT_FORMAT:-text}"
 AWS_PROFILE="${AWS_PROFILE:-default}"
 AWS_REGION="${AWS_REGION:-us-gov-west-1}"  # Default to GovCloud West
 REPORT_FILE="zig-phase-one-report-$(date +%Y%m%d-%H%M%S).json"
+DEBUG="${DEBUG:-false}"
 
 # Color codes for terminal output
 RED='\033[0;31m'
@@ -96,8 +97,12 @@ while [[ $# -gt 0 ]]; do
             OUTPUT_FORMAT="$2"
             shift 2
             ;;
+        --debug)
+            DEBUG="true"
+            shift
+            ;;
         --help|-h)
-            echo "Usage: $0 [--profile <aws-profile>] [--region <region>] [--output <json|text>]"
+            echo "Usage: $0 [--profile <aws-profile>] [--region <region>] [--output <json|text>] [--debug]"
             echo ""
             echo "NSA Zero Trust Implementation Guideline Phase One - AWS Compliance Checker"
             echo ""
@@ -105,6 +110,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --profile    AWS CLI profile to use (default: default)"
             echo "  --region     AWS region to check (default: us-east-1)"
             echo "  --output     Output format: json or text (default: text)"
+            echo "  --debug      Enable debug mode (show all AWS commands and errors)"
             echo ""
             exit 0
             ;;
@@ -158,7 +164,25 @@ log_finding() {
 aws_cmd() {
     # Wrapper for AWS CLI with rate limiting and error handling
     sleep "$RATE_LIMIT_DELAY"
-    timeout "$TIMEOUT_SECONDS" aws "$@" 2>/dev/null || echo ""
+    # Use gtimeout on macOS (from coreutils), timeout on Linux
+    local timeout_cmd="timeout"
+    command -v gtimeout &>/dev/null && timeout_cmd="gtimeout"
+    
+    if [[ "$DEBUG" == "true" ]]; then
+        echo -e "${CYAN}[DEBUG] Running: aws $*${NC}" >&2
+        local result
+        local exit_code
+        result=$($timeout_cmd "$TIMEOUT_SECONDS" aws "$@" 2>&1) && exit_code=$? || exit_code=$?
+        if [[ $exit_code -ne 0 ]]; then
+            echo -e "${RED}[DEBUG] Command failed (exit $exit_code): $result${NC}" >&2
+            echo ""
+        else
+            echo -e "${GREEN}[DEBUG] Command succeeded${NC}" >&2
+            echo "$result"
+        fi
+    else
+        $timeout_cmd "$TIMEOUT_SECONDS" aws "$@" 2>/dev/null || echo ""
+    fi
 }
 
 check_dependency() {
@@ -214,19 +238,19 @@ check_pillar_1_user() {
     log_info "Checking Activity 1.3.1 - MFA and IdP..."
     
     # Check if MFA is enabled for root account
-    ((total_checks++))
+    ((total_checks++)) || true || true
     local root_mfa
     root_mfa=$(aws_cmd iam get-account-summary --query 'SummaryMap.AccountMFAEnabled' --output text)
     if [[ "$root_mfa" == "1" ]]; then
         log_pass "Root account has MFA enabled"
-        ((pass_count++))
+        ((pass_count++)) || true || true
     else
         log_finding "BLOCKER" "1.3.1" "Root account does NOT have MFA enabled" \
             "Enable MFA on root account immediately: aws iam create-virtual-mfa-device"
     fi
     
     # Check for IAM users without MFA
-    ((total_checks++))
+    ((total_checks++)) || true
     local users_without_mfa=()
     # Generate credential report
     aws_cmd iam generate-credential-report >/dev/null
@@ -248,19 +272,19 @@ check_pillar_1_user() {
                 "Enforce MFA via IAM policies or AWS Organizations SCP"
         else
             log_pass "All IAM users with console access have MFA enabled"
-            ((pass_count++))
+            ((pass_count++)) || true
         fi
     else
         log_finding "MEDIUM" "1.3.1" "Could not generate credential report to check MFA status" ""
     fi
     
     # Check for IAM Identity Center (SSO) - the preferred IdP
-    ((total_checks++))
+    ((total_checks++)) || true
     local sso_instances
     sso_instances=$(aws_cmd sso-admin list-instances --query 'Instances[0].InstanceArn' --output text 2>/dev/null || echo "")
     if [[ -n "$sso_instances" && "$sso_instances" != "None" ]]; then
         log_pass "AWS IAM Identity Center (SSO) is configured"
-        ((pass_count++))
+        ((pass_count++)) || true
         
         # Check MFA settings in Identity Center
         local identity_store_id
@@ -277,7 +301,7 @@ check_pillar_1_user() {
     log_info "Checking Activity 1.4.1 - Privileged Access Management..."
     
     # Check for users with admin access
-    ((total_checks++))
+    ((total_checks++)) || true
     local admin_users=()
     local iam_users
     iam_users=$(aws_cmd iam list-users --query 'Users[].UserName' --output text)
@@ -295,14 +319,14 @@ check_pillar_1_user() {
     elif [[ ${#admin_users[@]} -gt 0 ]]; then
         log_finding "MEDIUM" "1.4.1" "Users with AdministratorAccess: ${admin_users[*]}" \
             "Consider using JIT access or role assumption instead of permanent admin"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_pass "No IAM users with direct AdministratorAccess policy"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # Check for long-lived access keys (>90 days)
-    ((total_checks++))
+    ((total_checks++)) || true
     local old_keys=()
     local current_date
     current_date=$(date +%s)
@@ -326,7 +350,7 @@ check_pillar_1_user() {
             "Rotate or delete old access keys: aws iam update-access-key --status Inactive"
     else
         log_pass "No access keys older than 90 days"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # -------------------------------------------------------------------------
@@ -335,7 +359,7 @@ check_pillar_1_user() {
     log_info "Checking Activity 1.5.1 - Identity Lifecycle Management..."
     
     # Check for unused IAM users (no activity in 90 days)
-    ((total_checks++))
+    ((total_checks++)) || true
     local inactive_users=()
     if [[ -n "$cred_report" ]]; then
         while IFS=, read -r user arn creation_date password_enabled password_last_used rest; do
@@ -355,7 +379,7 @@ check_pillar_1_user() {
             "Review and decommission unused accounts per ILM policy"
     else
         log_pass "No users inactive for 90+ days found"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # -------------------------------------------------------------------------
@@ -364,7 +388,7 @@ check_pillar_1_user() {
     log_info "Checking Activity 1.7.1 - Deny by Default Policy..."
     
     # Check for overly permissive IAM policies (Action: "*")
-    ((total_checks++))
+    ((total_checks++)) || true
     local permissive_policies=()
     local customer_policies
     customer_policies=$(aws_cmd iam list-policies --scope Local --query 'Policies[].Arn' --output text)
@@ -385,11 +409,11 @@ check_pillar_1_user() {
             "Implement least privilege - replace wildcards with specific actions/resources"
     else
         log_pass "No customer policies with unrestricted Action:* Resource:* found"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # Check for SCPs (Organization-level deny policies)
-    ((total_checks++))
+    ((total_checks++)) || true
     local org_id
     org_id=$(aws_cmd organizations describe-organization --query 'Organization.Id' --output text 2>/dev/null || echo "")
     if [[ -n "$org_id" && "$org_id" != "None" ]]; then
@@ -397,7 +421,7 @@ check_pillar_1_user() {
         scp_count=$(aws_cmd organizations list-policies --filter SERVICE_CONTROL_POLICY --query 'Policies | length(@)' --output text 2>/dev/null || echo "0")
         if [[ "$scp_count" -gt 1 ]]; then
             log_pass "AWS Organizations with SCPs detected ($scp_count policies)"
-            ((pass_count++))
+            ((pass_count++)) || true
         else
             log_finding "MEDIUM" "1.7.1" "Only default SCP - no custom deny policies" \
                 "Implement SCPs for deny-by-default at organization level"
@@ -437,7 +461,7 @@ check_pillar_2_device() {
     log_info "Checking Activity 2.1.2 - Device Inventory..."
     
     # Check if Systems Manager is tracking instances
-    ((total_checks++))
+    ((total_checks++)) || true
     local ssm_managed_count
     ssm_managed_count=$(aws_cmd ssm describe-instance-information --query 'InstanceInformationList | length(@)' --output text || echo "0")
     local ec2_running_count
@@ -449,7 +473,7 @@ check_pillar_2_device() {
                 "Install SSM agent on all instances for device management"
         else
             log_pass "SSM managing $ssm_managed_count instances"
-            ((pass_count++))
+            ((pass_count++)) || true
         fi
     else
         if [[ "$ec2_running_count" -gt 0 ]]; then
@@ -457,7 +481,7 @@ check_pillar_2_device() {
                 "Deploy SSM agent to all EC2 instances for device inventory and management"
         else
             log_pass "No EC2 instances running - SSM check N/A"
-            ((pass_count++))
+            ((pass_count++)) || true
         fi
     fi
     
@@ -467,7 +491,7 @@ check_pillar_2_device() {
     log_info "Checking Activity 2.4.1 - Deny Device by Default..."
     
     # Check default security groups (should have no inbound rules)
-    ((total_checks++))
+    ((total_checks++)) || true
     local permissive_default_sgs=()
     local vpcs
     vpcs=$(aws_cmd ec2 describe-vpcs --query 'Vpcs[].VpcId' --output text)
@@ -488,11 +512,11 @@ check_pillar_2_device() {
             "Remove all rules from default SGs and use explicit SGs for resources"
     else
         log_pass "Default security groups have no inbound rules"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # Check for 0.0.0.0/0 inbound rules
-    ((total_checks++))
+    ((total_checks++)) || true
     local open_sgs=()
     local all_sgs
     all_sgs=$(aws_cmd ec2 describe-security-groups --query 'SecurityGroups[].GroupId' --output text)
@@ -513,7 +537,7 @@ check_pillar_2_device() {
             "Ensure these are intentional (ALB, CloudFront origins, etc.)"
     else
         log_pass "No security groups with unrestricted 0.0.0.0/0 inbound"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # -------------------------------------------------------------------------
@@ -522,12 +546,12 @@ check_pillar_2_device() {
     log_info "Checking Activity 2.5.1 - Vulnerability and Patch Management..."
     
     # Check if AWS Inspector is enabled
-    ((total_checks++))
+    ((total_checks++)) || true
     local inspector_status
     inspector_status=$(aws_cmd inspector2 batch-get-account-status --query 'accounts[0].state.status' --output text 2>/dev/null || echo "")
     if [[ "$inspector_status" == "ENABLED" ]]; then
         log_pass "AWS Inspector is enabled"
-        ((pass_count++))
+        ((pass_count++)) || true
         
         # Check for critical findings
         local critical_findings
@@ -544,7 +568,7 @@ check_pillar_2_device() {
     fi
     
     # Check SSM Patch Manager compliance
-    ((total_checks++))
+    ((total_checks++)) || true
     local noncompliant_instances
     noncompliant_instances=$(aws_cmd ssm describe-instance-patch-states \
         --query 'InstancePatchStates[?MissingCount > `0` || FailedCount > `0`] | length(@)' --output text 2>/dev/null || echo "0")
@@ -553,7 +577,7 @@ check_pillar_2_device() {
             "Review patch compliance: aws ssm describe-instance-patch-states"
     else
         log_pass "All managed instances are patch compliant"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # -------------------------------------------------------------------------
@@ -562,12 +586,12 @@ check_pillar_2_device() {
     log_info "Checking Activity 2.6.1/2.6.2 - Endpoint Management..."
     
     # Check SSM State Manager associations
-    ((total_checks++))
+    ((total_checks++)) || true
     local state_mgr_assocs
     state_mgr_assocs=$(aws_cmd ssm list-associations --query 'Associations | length(@)' --output text || echo "0")
     if [[ "$state_mgr_assocs" -gt 0 ]]; then
         log_pass "SSM State Manager has $state_mgr_assocs configuration associations"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "MEDIUM" "2.6.1" "No SSM State Manager associations configured" \
             "Configure State Manager for endpoint configuration management"
@@ -579,7 +603,7 @@ check_pillar_2_device() {
     log_info "Checking Activity 2.7.1 - EDR Integration..."
     
     # Check GuardDuty (AWS's threat detection)
-    ((total_checks++))
+    ((total_checks++)) || true
     local gd_detector_id
     gd_detector_id=$(aws_cmd guardduty list-detectors --query 'DetectorIds[0]' --output text 2>/dev/null || echo "")
     if [[ -n "$gd_detector_id" && "$gd_detector_id" != "None" ]]; then
@@ -587,7 +611,7 @@ check_pillar_2_device() {
         gd_status=$(aws_cmd guardduty get-detector --detector-id "$gd_detector_id" --query 'Status' --output text 2>/dev/null || echo "")
         if [[ "$gd_status" == "ENABLED" ]]; then
             log_pass "GuardDuty is enabled (detector: $gd_detector_id)"
-            ((pass_count++))
+            ((pass_count++)) || true
             
             # Check for high/critical findings
             local high_findings
@@ -636,7 +660,7 @@ check_pillar_3_application() {
     log_info "Checking Activity 3.2.1/3.2.2 - DevSecOps Practices..."
     
     # Check for ECR image scanning
-    ((total_checks++))
+    ((total_checks++)) || true
     local ecr_repos
     ecr_repos=$(aws_cmd ecr describe-repositories --query 'repositories[].repositoryName' --output text 2>/dev/null || echo "")
     if [[ -n "$ecr_repos" ]]; then
@@ -655,20 +679,20 @@ check_pillar_3_application() {
                 "Enable image scanning: aws ecr put-image-scanning-configuration --scan-on-push"
         else
             log_pass "All ECR repositories have scan-on-push enabled"
-            ((pass_count++))
+            ((pass_count++)) || true
         fi
     else
         log_info "No ECR repositories found - check N/A"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # Check for CodePipeline/CodeBuild (CI/CD)
-    ((total_checks++))
+    ((total_checks++)) || true
     local pipelines
     pipelines=$(aws_cmd codepipeline list-pipelines --query 'pipelines | length(@)' --output text 2>/dev/null || echo "0")
     if [[ "$pipelines" -gt 0 ]]; then
         log_pass "CodePipeline detected with $pipelines pipelines"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "LOW" "3.2.1" "No CodePipeline detected - verify CI/CD is implemented elsewhere" ""
     fi
@@ -679,7 +703,7 @@ check_pillar_3_application() {
     log_info "Checking Activity 3.3.1/3.3.2 - Software Risk Management..."
     
     # Check ECR vulnerability findings
-    ((total_checks++))
+    ((total_checks++)) || true
     if [[ -n "$ecr_repos" ]]; then
         local total_critical=0
         for repo in $ecr_repos; do
@@ -696,10 +720,10 @@ check_pillar_3_application() {
                 "Review and patch container images"
         else
             log_pass "No critical vulnerabilities in latest ECR images"
-            ((pass_count++))
+            ((pass_count++)) || true
         fi
     else
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # -------------------------------------------------------------------------
@@ -708,7 +732,7 @@ check_pillar_3_application() {
     log_info "Checking Activity 3.4.1/3.4.3 - Resource Authorization..."
     
     # Check Lambda function resource policies
-    ((total_checks++))
+    ((total_checks++)) || true
     local lambda_functions
     lambda_functions=$(aws_cmd lambda list-functions --query 'Functions[].FunctionName' --output text 2>/dev/null || echo "")
     local public_lambdas=()
@@ -725,11 +749,11 @@ check_pillar_3_application() {
             "Review and restrict Lambda resource policies"
     else
         log_pass "No Lambda functions with unrestricted public access"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # Check EKS cluster endpoint access
-    ((total_checks++))
+    ((total_checks++)) || true
     local eks_clusters
     eks_clusters=$(aws_cmd eks list-clusters --query 'clusters' --output text 2>/dev/null || echo "")
     local public_eks=()
@@ -754,7 +778,7 @@ check_pillar_3_application() {
         else
             log_info "No EKS clusters found - check N/A"
         fi
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     PILLAR_SCORES["APPLICATION"]="$pass_count/$total_checks"
@@ -787,7 +811,7 @@ check_pillar_4_data() {
     log_info "Checking Activity 4.2.1/4.3.1 - Data Classification..."
     
     # Check if Macie is enabled (NOT available in GovCloud)
-    ((total_checks++))
+    ((total_checks++)) || true
     if [[ "$AWS_REGION" == us-gov-* ]]; then
         log_finding "MEDIUM" "4.3.1" "Amazon Macie is NOT available in GovCloud regions" \
             "Use third-party DLP (Trellix, Forcepoint) or manual classification for data discovery"
@@ -796,7 +820,7 @@ check_pillar_4_data() {
         macie_status=$(aws_cmd macie2 get-macie-session --query 'status' --output text 2>/dev/null || echo "")
         if [[ "$macie_status" == "ENABLED" ]]; then
             log_pass "Amazon Macie is enabled for data classification"
-            ((pass_count++))
+            ((pass_count++)) || true
         else
             log_finding "MEDIUM" "4.3.1" "Amazon Macie is not enabled" \
                 "Enable Macie for automated data discovery and classification"
@@ -809,7 +833,7 @@ check_pillar_4_data() {
     log_info "Checking Activity 4.4.3 - File Activity Monitoring..."
     
     # Check S3 bucket logging
-    ((total_checks++))
+    ((total_checks++)) || true
     local buckets
     buckets=$(aws_cmd s3api list-buckets --query 'Buckets[].Name' --output text 2>/dev/null || echo "")
     local buckets_without_logging=()
@@ -826,7 +850,7 @@ check_pillar_4_data() {
             "Enable S3 server access logging for audit trails"
     else
         log_pass "All S3 buckets have access logging enabled"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # -------------------------------------------------------------------------
@@ -835,7 +859,7 @@ check_pillar_4_data() {
     log_info "Checking Activity 4.5.1 - Data Protection..."
     
     # Check S3 default encryption
-    ((total_checks++))
+    ((total_checks++)) || true
     local unencrypted_buckets=()
     for bucket in $buckets; do
         local encryption
@@ -852,11 +876,11 @@ check_pillar_4_data() {
             "Enable default encryption: aws s3api put-bucket-encryption"
     else
         log_pass "All S3 buckets have default encryption enabled"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # Check RDS encryption
-    ((total_checks++))
+    ((total_checks++)) || true
     local rds_instances
     rds_instances=$(aws_cmd rds describe-db-instances --query 'DBInstances[].DBInstanceIdentifier' --output text 2>/dev/null || echo "")
     local unencrypted_rds=()
@@ -878,11 +902,11 @@ check_pillar_4_data() {
         else
             log_info "No RDS instances found - check N/A"
         fi
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # Check KMS key rotation
-    ((total_checks++))
+    ((total_checks++)) || true
     local kms_keys
     kms_keys=$(aws_cmd kms list-keys --query 'Keys[].KeyId' --output text 2>/dev/null || echo "")
     local keys_without_rotation=()
@@ -904,7 +928,7 @@ check_pillar_4_data() {
             "Enable key rotation: aws kms enable-key-rotation"
     else
         log_pass "All symmetric KMS keys have rotation enabled"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # -------------------------------------------------------------------------
@@ -913,14 +937,14 @@ check_pillar_4_data() {
     log_info "Checking Activity 4.6.1 - Data Loss Prevention..."
     
     # Check S3 Block Public Access
-    ((total_checks++))
+    ((total_checks++)) || true
     local public_access_blocks
     public_access_blocks=$(aws_cmd s3control get-public-access-block --account-id "$ACCOUNT_ID" \
         --query 'PublicAccessBlockConfiguration' --output json 2>/dev/null || echo "{}")
     
     if echo "$public_access_blocks" | jq -e '.BlockPublicAcls == true and .IgnorePublicAcls == true and .BlockPublicPolicy == true and .RestrictPublicBuckets == true' >/dev/null 2>&1; then
         log_pass "Account-level S3 Block Public Access is fully enabled"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "HIGH" "4.6.1" "Account-level S3 Block Public Access is not fully enabled" \
             "Enable all settings: aws s3control put-public-access-block"
@@ -954,7 +978,7 @@ check_pillar_5_network() {
     log_info "Checking Activity 5.1.2 - Granular Access Rules..."
     
     # Check VPC Flow Logs
-    ((total_checks++))
+    ((total_checks++)) || true
     local vpcs_without_flow_logs=()
     for vpc in $(aws_cmd ec2 describe-vpcs --query 'Vpcs[].VpcId' --output text); do
         local flow_logs
@@ -970,7 +994,7 @@ check_pillar_5_network() {
             "Enable VPC Flow Logs for network visibility: aws ec2 create-flow-logs"
     else
         log_pass "All VPCs have flow logs enabled"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # -------------------------------------------------------------------------
@@ -979,19 +1003,19 @@ check_pillar_5_network() {
     log_info "Checking Activity 5.2.2/5.3.1 - Network Segmentation..."
     
     # Check for Network ACLs
-    ((total_checks++))
+    ((total_checks++)) || true
     local nacl_count
     nacl_count=$(aws_cmd ec2 describe-network-acls --query 'NetworkAcls | length(@)' --output text || echo "0")
     if [[ "$nacl_count" -gt 1 ]]; then
         log_pass "Network ACLs in use ($nacl_count NACLs)"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "MEDIUM" "5.3.1" "Only default NACLs - no macro-segmentation" \
             "Implement custom NACLs for network segmentation"
     fi
     
     # Check for multiple subnets (tiered architecture)
-    ((total_checks++))
+    ((total_checks++)) || true
     local subnet_count
     subnet_count=$(aws_cmd ec2 describe-subnets --query 'Subnets | length(@)' --output text || echo "0")
     local public_subnets
@@ -1001,7 +1025,7 @@ check_pillar_5_network() {
     
     if [[ "$private_subnets" -gt 0 && "$public_subnets" -gt 0 ]]; then
         log_pass "Tiered network: $public_subnets public, $private_subnets private subnets"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "MEDIUM" "5.3.1" "Network not properly tiered (public/private separation)" \
             "Implement public/private subnet architecture"
@@ -1013,7 +1037,7 @@ check_pillar_5_network() {
     log_info "Checking Activity 5.4.1 - Micro-Segmentation..."
     
     # Check for security group diversity (micro-segmentation indicator)
-    ((total_checks++))
+    ((total_checks++)) || true
     local sg_count
     sg_count=$(aws_cmd ec2 describe-security-groups --query 'SecurityGroups | length(@)' --output text || echo "0")
     local ec2_count="$ec2_running_count"
@@ -1021,17 +1045,17 @@ check_pillar_5_network() {
     
     if [[ "$ec2_count" -gt 0 && "$sg_count" -gt "$ec2_count" ]]; then
         log_pass "Good security group diversity ($sg_count SGs for $ec2_count instances)"
-        ((pass_count++))
+        ((pass_count++)) || true
     elif [[ "$ec2_count" -gt 0 ]]; then
         log_finding "MEDIUM" "5.4.1" "Low security group diversity ($sg_count SGs for $ec2_count instances)" \
             "Implement more granular security groups per application/tier"
     else
         log_pass "No EC2 instances - micro-segmentation check N/A"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     # Check for WAF
-    ((total_checks++))
+    ((total_checks++)) || true
     local waf_acls
     waf_acls=$(aws_cmd wafv2 list-web-acls --scope REGIONAL --query 'WebACLs | length(@)' --output text 2>/dev/null || echo "0")
     local waf_cf_acls
@@ -1039,7 +1063,7 @@ check_pillar_5_network() {
     
     if [[ "$waf_acls" -gt 0 || "$waf_cf_acls" -gt 0 ]]; then
         log_pass "WAF is configured ($waf_acls regional, $waf_cf_acls CloudFront ACLs)"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "HIGH" "5.4.1" "No WAF Web ACLs configured" \
             "Implement AWS WAF for application layer protection"
@@ -1073,12 +1097,12 @@ check_pillar_6_automation() {
     log_info "Checking Activity 6.1.2 - Access Profiles..."
     
     # Check IAM Access Analyzer
-    ((total_checks++))
+    ((total_checks++)) || true
     local analyzers
     analyzers=$(aws_cmd accessanalyzer list-analyzers --query 'analyzers[?status==`ACTIVE`] | length(@)' --output text 2>/dev/null || echo "0")
     if [[ "$analyzers" -gt 0 ]]; then
         log_pass "IAM Access Analyzer is active ($analyzers analyzers)"
-        ((pass_count++))
+        ((pass_count++)) || true
         
         # Check for findings
         local analyzer_findings
@@ -1099,12 +1123,12 @@ check_pillar_6_automation() {
     log_info "Checking Activity 6.5.2 - Security Orchestration..."
     
     # Check Security Hub
-    ((total_checks++))
+    ((total_checks++)) || true
     local securityhub_status
     securityhub_status=$(aws_cmd securityhub describe-hub --query 'HubArn' --output text 2>/dev/null || echo "")
     if [[ -n "$securityhub_status" && "$securityhub_status" != "None" ]]; then
         log_pass "Security Hub is enabled"
-        ((pass_count++))
+        ((pass_count++)) || true
         
         # Check enabled standards
         local standards
@@ -1121,12 +1145,12 @@ check_pillar_6_automation() {
     fi
     
     # Check for EventBridge rules (automation)
-    ((total_checks++))
+    ((total_checks++)) || true
     local event_rules
     event_rules=$(aws_cmd events list-rules --query 'Rules | length(@)' --output text 2>/dev/null || echo "0")
     if [[ "$event_rules" -gt 0 ]]; then
         log_pass "EventBridge has $event_rules rules configured"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "LOW" "6.7.1" "No EventBridge rules - limited event-driven automation" \
             "Implement EventBridge rules for automated security responses"
@@ -1138,7 +1162,7 @@ check_pillar_6_automation() {
     log_info "Checking Activity 6.6.2 - API Standardization..."
     
     # Check API Gateway REST APIs
-    ((total_checks++))
+    ((total_checks++)) || true
     local rest_apis
     rest_apis=$(aws_cmd apigateway get-rest-apis --query 'items | length(@)' --output text 2>/dev/null || echo "0")
     local http_apis
@@ -1146,7 +1170,7 @@ check_pillar_6_automation() {
     
     if [[ "$rest_apis" -gt 0 || "$http_apis" -gt 0 ]]; then
         log_pass "API Gateway in use ($rest_apis REST, $http_apis HTTP APIs)"
-        ((pass_count++))
+        ((pass_count++)) || true
         
         # Check for API keys / authorization
         local api_keys
@@ -1157,7 +1181,7 @@ check_pillar_6_automation() {
         fi
     else
         log_info "No API Gateway APIs found - check N/A"
-        ((pass_count++))
+        ((pass_count++)) || true
     fi
     
     PILLAR_SCORES["AUTOMATION"]="$pass_count/$total_checks"
@@ -1189,7 +1213,7 @@ check_pillar_7_visibility() {
     log_info "Checking Activity 7.1.2 - Log Collection..."
     
     # Check CloudTrail
-    ((total_checks++))
+    ((total_checks++)) || true
     local trails
     trails=$(aws_cmd cloudtrail describe-trails --query 'trailList' --output json 2>/dev/null || echo "[]")
     local trail_count
@@ -1203,7 +1227,7 @@ check_pillar_7_visibility() {
         
         if [[ "$multi_region" -gt 0 ]]; then
             log_pass "Multi-region CloudTrail is enabled"
-            ((pass_count++))
+            ((pass_count++)) || true
         else
             log_finding "HIGH" "7.1.2" "CloudTrail is not multi-region" \
                 "Enable multi-region trail: aws cloudtrail update-trail --is-multi-region-trail"
@@ -1224,12 +1248,12 @@ check_pillar_7_visibility() {
     fi
     
     # Check CloudWatch Log Groups
-    ((total_checks++))
+    ((total_checks++)) || true
     local log_groups
     log_groups=$(aws_cmd logs describe-log-groups --query 'logGroups | length(@)' --output text 2>/dev/null || echo "0")
     if [[ "$log_groups" -gt 0 ]]; then
         log_pass "CloudWatch Logs has $log_groups log groups"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "HIGH" "7.1.2" "No CloudWatch Log Groups found" \
             "Configure application and security logging to CloudWatch"
@@ -1241,24 +1265,24 @@ check_pillar_7_visibility() {
     log_info "Checking Activity 7.2.1/7.2.4 - Threat Alerting..."
     
     # Check CloudWatch Alarms
-    ((total_checks++))
+    ((total_checks++)) || true
     local alarms
     alarms=$(aws_cmd cloudwatch describe-alarms --query 'MetricAlarms | length(@)' --output text 2>/dev/null || echo "0")
     if [[ "$alarms" -gt 0 ]]; then
         log_pass "CloudWatch has $alarms metric alarms configured"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "HIGH" "7.2.1" "No CloudWatch alarms configured" \
             "Configure alarms for security metrics and anomalies"
     fi
     
     # Check SNS topics for alerting
-    ((total_checks++))
+    ((total_checks++)) || true
     local sns_topics
     sns_topics=$(aws_cmd sns list-topics --query 'Topics | length(@)' --output text 2>/dev/null || echo "0")
     if [[ "$sns_topics" -gt 0 ]]; then
         log_pass "SNS topics available for alerting ($sns_topics topics)"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "MEDIUM" "7.2.1" "No SNS topics for alerting" \
             "Create SNS topics for security alert delivery"
@@ -1270,7 +1294,7 @@ check_pillar_7_visibility() {
     log_info "Checking Activity 7.3.1 - Analytics Tools..."
     
     # Check AWS Config
-    ((total_checks++))
+    ((total_checks++)) || true
     local config_recorders
     config_recorders=$(aws_cmd configservice describe-configuration-recorders --query 'ConfigurationRecorders | length(@)' --output text 2>/dev/null || echo "0")
     if [[ "$config_recorders" -gt 0 ]]; then
@@ -1278,7 +1302,7 @@ check_pillar_7_visibility() {
         recorder_status=$(aws_cmd configservice describe-configuration-recorder-status --query 'ConfigurationRecordersStatus[0].recording' --output text 2>/dev/null || echo "")
         if [[ "$recorder_status" == "True" ]]; then
             log_pass "AWS Config is recording"
-            ((pass_count++))
+            ((pass_count++)) || true
         else
             log_finding "HIGH" "7.3.1" "AWS Config recorder exists but is not recording" \
                 "Start recording: aws configservice start-configuration-recorder"
@@ -1289,12 +1313,12 @@ check_pillar_7_visibility() {
     fi
     
     # Check Config Rules
-    ((total_checks++))
+    ((total_checks++)) || true
     local config_rules
     config_rules=$(aws_cmd configservice describe-config-rules --query 'ConfigRules | length(@)' --output text 2>/dev/null || echo "0")
     if [[ "$config_rules" -gt 0 ]]; then
         log_pass "AWS Config has $config_rules rules for compliance checking"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "MEDIUM" "7.3.1" "No AWS Config rules defined" \
             "Enable managed Config rules or create custom rules"
@@ -1307,12 +1331,12 @@ check_pillar_7_visibility() {
     
     # GuardDuty already checked in Pillar 2
     # Check for Detective (advanced threat investigation)
-    ((total_checks++))
+    ((total_checks++)) || true
     local detective_graphs
     detective_graphs=$(aws_cmd detective list-graphs --query 'GraphList | length(@)' --output text 2>/dev/null || echo "0")
     if [[ "$detective_graphs" -gt 0 ]]; then
         log_pass "Amazon Detective is enabled for threat investigation"
-        ((pass_count++))
+        ((pass_count++)) || true
     else
         log_finding "LOW" "7.5.1" "Amazon Detective is not enabled" \
             "Consider enabling Detective for advanced threat investigation"
