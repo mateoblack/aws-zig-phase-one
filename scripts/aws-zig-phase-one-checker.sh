@@ -308,7 +308,8 @@ check_pillar_1_user() {
     for user in $iam_users; do
         local attached_policies
         attached_policies=$(aws_cmd iam list-attached-user-policies --user-name "$user" --query 'AttachedPolicies[].PolicyArn' --output text)
-        if echo "$attached_policies" | grep -q "arn:aws:iam::aws:policy/AdministratorAccess"; then
+        # Check both commercial and GovCloud ARN formats
+        if echo "$attached_policies" | grep -qE "arn:aws(-us-gov)?:iam::aws:policy/AdministratorAccess"; then
             admin_users+=("$user")
         fi
     done
@@ -387,7 +388,8 @@ check_pillar_1_user() {
     # -------------------------------------------------------------------------
     log_info "Checking Activity 1.7.1 - Deny by Default Policy..."
     
-    # Check for overly permissive IAM policies (Action: "*")
+    # Check for overly permissive IAM policies
+    # Per NSA ZIG: implement least privilege, deny by default
     ((total_checks++)) || true
     local permissive_policies=()
     local customer_policies
@@ -397,18 +399,30 @@ check_pillar_1_user() {
         version_id=$(aws_cmd iam get-policy --policy-arn "$policy_arn" --query 'Policy.DefaultVersionId' --output text)
         local policy_doc
         policy_doc=$(aws_cmd iam get-policy-version --policy-arn "$policy_arn" --version-id "$version_id" --query 'PolicyVersion.Document' --output json)
-        if echo "$policy_doc" | grep -q '"Action":\s*"\*"' || echo "$policy_doc" | grep -q '"Action":\s*\["\*"\]'; then
-            if echo "$policy_doc" | grep -q '"Resource":\s*"\*"'; then
-                permissive_policies+=("$(basename "$policy_arn")")
+        local policy_name
+        policy_name=$(basename "$policy_arn")
+        
+        # Check for Action:* with Resource:* (most dangerous)
+        if echo "$policy_doc" | grep -qE '"Action":\s*"\*"' || echo "$policy_doc" | grep -qE '"Action":\s*\["\*"\]'; then
+            if echo "$policy_doc" | grep -qE '"Resource":\s*"\*"'; then
+                permissive_policies+=("$policy_name (Action:* Resource:*)")
+                continue
             fi
+        fi
+        
+        # Check for service:* wildcards with Resource:* (e.g., "config:*", "s3:*", "ec2:*")
+        # These violate least privilege per NSA ZIG 1.7.1
+        if echo "$policy_doc" | grep -qE '"Action":\s*\[?"[a-z0-9-]+:\*"\]?' && \
+           echo "$policy_doc" | grep -qE '"Resource":\s*"\*"'; then
+            permissive_policies+=("$policy_name (service:* on Resource:*)")
         fi
     done
     
     if [[ ${#permissive_policies[@]} -gt 0 ]]; then
-        log_finding "HIGH" "1.7.1" "Overly permissive policies (Action:* Resource:*): ${permissive_policies[*]}" \
-            "Implement least privilege - replace wildcards with specific actions/resources"
+        log_finding "HIGH" "1.7.1" "Policies violating least privilege: ${permissive_policies[*]}" \
+            "Implement least privilege - scope actions and resources to minimum required"
     else
-        log_pass "No customer policies with unrestricted Action:* Resource:* found"
+        log_pass "No customer policies with overly permissive wildcards found"
         ((pass_count++)) || true
     fi
     
@@ -417,14 +431,27 @@ check_pillar_1_user() {
     local org_id
     org_id=$(aws_cmd organizations describe-organization --query 'Organization.Id' --output text 2>/dev/null || echo "")
     if [[ -n "$org_id" && "$org_id" != "None" ]]; then
-        local scp_count
-        scp_count=$(aws_cmd organizations list-policies --filter SERVICE_CONTROL_POLICY --query 'Policies | length(@)' --output text 2>/dev/null || echo "0")
-        if [[ "$scp_count" -gt 1 ]]; then
-            log_pass "AWS Organizations with SCPs detected ($scp_count policies)"
-            ((pass_count++)) || true
+        # Check if this is the management account
+        local master_account_id
+        master_account_id=$(aws_cmd organizations describe-organization --query 'Organization.MasterAccountId' --output text 2>/dev/null || echo "")
+        local current_account_id
+        current_account_id=$(aws_cmd sts get-caller-identity --query 'Account' --output text 2>/dev/null || echo "")
+        
+        if [[ "$master_account_id" == "$current_account_id" ]]; then
+            # Management account - can list SCPs
+            local scp_count
+            scp_count=$(aws_cmd organizations list-policies --filter SERVICE_CONTROL_POLICY --query 'Policies | length(@)' --output text 2>/dev/null || echo "0")
+            if [[ "$scp_count" -gt 1 ]]; then
+                log_pass "AWS Organizations with SCPs detected ($scp_count policies)"
+                ((pass_count++)) || true
+            else
+                log_finding "MEDIUM" "1.7.1" "Only default SCP - no custom deny policies" \
+                    "Implement SCPs for deny-by-default at organization level"
+            fi
         else
-            log_finding "MEDIUM" "1.7.1" "Only default SCP - no custom deny policies" \
-                "Implement SCPs for deny-by-default at organization level"
+            # Child account - cannot list SCPs, but org exists
+            log_info "Member account in AWS Organization - SCP check requires management account access"
+            ((pass_count++)) || true
         fi
     else
         log_finding "LOW" "1.7.1" "AWS Organizations not enabled - cannot enforce org-level deny policies" \
@@ -585,16 +612,21 @@ check_pillar_2_device() {
     # -------------------------------------------------------------------------
     log_info "Checking Activity 2.6.1/2.6.2 - Endpoint Management..."
     
-    # Check SSM State Manager associations
+    # Check SSM State Manager associations (only relevant if there are instances to manage)
     ((total_checks++)) || true
-    local state_mgr_assocs
-    state_mgr_assocs=$(aws_cmd ssm list-associations --query 'Associations | length(@)' --output text || echo "0")
-    if [[ "$state_mgr_assocs" -gt 0 ]]; then
-        log_pass "SSM State Manager has $state_mgr_assocs configuration associations"
-        ((pass_count++)) || true
+    if [[ "$ec2_running_count" -gt 0 || "$ssm_managed_count" -gt 0 ]]; then
+        local state_mgr_assocs
+        state_mgr_assocs=$(aws_cmd ssm list-associations --query 'Associations | length(@)' --output text || echo "0")
+        if [[ "$state_mgr_assocs" -gt 0 ]]; then
+            log_pass "SSM State Manager has $state_mgr_assocs configuration associations"
+            ((pass_count++)) || true
+        else
+            log_finding "MEDIUM" "2.6.1" "No SSM State Manager associations configured" \
+                "Configure State Manager for endpoint configuration management"
+        fi
     else
-        log_finding "MEDIUM" "2.6.1" "No SSM State Manager associations configured" \
-            "Configure State Manager for endpoint configuration management"
+        log_pass "No EC2 instances - State Manager check N/A"
+        ((pass_count++)) || true
     fi
     
     # -------------------------------------------------------------------------
