@@ -1,7 +1,7 @@
 # NSA Zero Trust Implementation Guideline (ZIG) Phase One
 ## AWS GovCloud Compliance Checker
 
-> ⚠️ **Status: Beta** - Checks are based on AWS CLI output and NSA ZIG Phase One requirements. Validate findings before using for formal compliance reporting. If you notice any issues, please [open an issue](https://github.com/mateoblack/aws-zig-phase-one/issues) for fastest resolution—fixes will be implemented within 24 hours until stable.
+> ⚠️ **Status: Archieved** 
 
 Assess your AWS GovCloud environment against the [NSA Zero Trust Implementation Guideline Phase One](https://media.defense.gov/2026/Jan/30/2003868308/-1/-1/0/CTR_ZIG_PHASE_ONE.PDF) requirements.
 
